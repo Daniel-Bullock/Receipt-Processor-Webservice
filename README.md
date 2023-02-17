@@ -1,6 +1,7 @@
 # Receipt-Processor-Webservice
 
 1. Install dependencies
+\
 In your terminal run:
     \
     &emsp; go get github.com/gin-gonic/gin
