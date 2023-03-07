@@ -1,5 +1,6 @@
 package main
 
+// Import necessary packages including the gin web framework and uuid for generating random ids
 import (
 	"math"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Definea a struct to represent the receipt JSON
+// Defines a struct to represent the receipt JSON
 type Receipt struct {
 	Retailer     string `json:"retailer"`
 	PurchaseDate string `json:"purchaseDate"`
@@ -19,42 +20,48 @@ type Receipt struct {
 	Total        string `json:"total"`
 }
 
-// Definea a struct to represent an item on the receipt
+// Defines a struct to represent an item on the receipt
 type Item struct {
 	ShortDescription string `json:"shortDescription"`
 	Price            string `json:"price"`
 }
 
-// Definea a map to store the receipts in memory
+// Defines a map to store the receipts in memory
 var receipts = make(map[string]Receipt)
 
-// Definea a function to generate a new ID for the receipt
+// Defines a function to generate a new ID for the receipt
 func generateID() string {
 	// Generate a new UUID
 	id, err := uuid.NewRandom()
 	if err != nil {
-		panic(err)
+		panic(err) //something is wrong with uuids so print an error
 	}
 
 	// Return the UUID as a string
 	return id.String()
 }
 
+// The gin Context is a structure that contains both the http.Request and the http.Response
+// that a normal http.Handler would use, plus some useful methods and shortcuts to manipulate those
+// Takes in a JSON receipt, generates id and stores it in map, and returns a JSON object with the ID
 func processReceipts(c *gin.Context) {
-	// Parse the JSON payload from the request
+	// Parses the JSON payload from the request, stores it in the var receipt
 	var receipt Receipt
 	if err := c.BindJSON(&receipt); err != nil {
-		c.AbortWithStatusJSON(400, gin.H{"error": err.Error()})
+		c.AbortWithStatusJSON(400, gin.H{"error": err.Error()}) //Bad Request error
 		return
 	}
 
-	// Generate a new ID for the receipt
+	// Generates a new ID for the receipt
 	id := generateID()
 
 	// Store the receipt in memory
 	receipts[id] = receipt
 
-	// Return the ID in the response
+	// Returns the ID in the response
+	// Serializes the data as JSON and sends it to the client with an indentation of 4 spaces
+	// Returns a status code of 200 (OK)
+	// "id" is the string literal representing the key to the JSON object while id is the variable which contains the value for that key
 	c.IndentedJSON(200, gin.H{"id": id})
 }
 
@@ -64,6 +71,7 @@ func stringToFloat64(total string) float64 {
 	return f
 }
 
+// Function to calculate the points for a receipt based on the 10 rules
 func calculatePoints(receipt Receipt) int {
 	points := 0
 
@@ -80,7 +88,7 @@ func calculatePoints(receipt Receipt) int {
 	}
 
 	// Rule 3: 25 points if the total is a multiple of 0.25.
-	if receipt.Total == "0" || (float64(int(100*stringToFloat64(receipt.Total))/25)*0.25) == stringToFloat64(receipt.Total) {
+	if receipt.Total == "0" || math.Mod(stringToFloat64(receipt.Total), 0.25) == 0 {
 		points += 25
 	}
 
@@ -112,32 +120,36 @@ func calculatePoints(receipt Receipt) int {
 	return points
 }
 
+// Getter endpoint that looks up the receipt by the ID and returns an object specifying the points awarded
 func getPoints(c *gin.Context) {
-	// Get the ID from the URL parameter
+	// Gets the ID from the URL parameter
 	id := c.Param("id")
 
-	// Look up the receipt by ID
+	// Looks up the receipt by ID
 	receipt, ok := receipts[id]
 	if !ok {
 		c.AbortWithStatusJSON(404, gin.H{"error": "Receipt not found"})
 		return
 	}
 
-	// Calculate the points for the receipt
+	// Calculates the points for the receipt
 	points := calculatePoints(receipt)
 
-	// Return the points in the response
+	// Returns the points in the response
 	c.IndentedJSON(200, gin.H{"points": points})
 }
 
 func main() {
+
+	//creates a new Gin router, Default() returns a new instance of the gin.Engine struct, which represents the main router of the Gin web framework
 	router := gin.Default()
 
-	// Define the Process Receipts endpoint
+	// Defines the Process Receipts endpoint
 	router.POST("/receipts/process", processReceipts)
 
-	// Define the Get Points endpoint
+	// Defines the Get Points endpoint
 	router.GET("/receipts/:id/points", getPoints)
 
+	// Starts the router and listens for HTPP requests on port 8080
 	router.Run("localhost:8080")
 }
