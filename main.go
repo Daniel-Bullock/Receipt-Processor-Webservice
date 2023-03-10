@@ -3,6 +3,7 @@ package main
 // Import necessary packages including the gin web framework and uuid for generating random ids
 import (
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -41,8 +42,10 @@ func generateID() string {
 	return id.String()
 }
 
-// The gin Context is a structure that contains both the http.Request and the http.Response
+// ~Note about (c *gin.Context) input~
+// gin Context is a structure that contains both the http.Request and the http.Response
 // that a normal http.Handler would use, plus some useful methods and shortcuts to manipulate those
+
 // Takes in a JSON receipt, generates id and stores it in map, and returns a JSON object with the ID
 func processReceipts(c *gin.Context) {
 	// Parses the JSON payload from the request, stores it in the var receipt
@@ -50,6 +53,37 @@ func processReceipts(c *gin.Context) {
 	if err := c.BindJSON(&receipt); err != nil {
 		c.AbortWithStatusJSON(400, gin.H{"error": err.Error()}) //Bad Request error
 		return
+	}
+
+	// Verify that retailer is not empty and contains only alphabets, numbers, or spaces.
+	if !regexp.MustCompile(`^[A-Za-z0-9\s]+$`).MatchString(receipt.Retailer) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid retailer name"})
+		return
+	}
+
+	// Ensure that the purchaseDate is a valid date string in the format "yyyy-mm-dd"
+	if _, err := time.Parse("2006-01-02", receipt.PurchaseDate); err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid purchase date"})
+		return
+	}
+
+	// Ensure that the purchaseTime is a valid time string in the format "hh:mm"
+	if _, err := time.Parse("15:04", receipt.PurchaseTime); err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid purchase time"})
+		return
+	}
+
+	// Verify that each item in the "items" array has a non-empty "shortDescription" field and a valid "price" field
+	for i, item := range receipt.Items {
+		if item.ShortDescription == "" {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Item description cannot be empty"})
+			return
+		}
+		if _, err := strconv.ParseFloat(item.Price, 64); err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid item price"})
+			return
+		}
+		receipt.Items[i] = item
 	}
 
 	// Generates a new ID for the receipt
